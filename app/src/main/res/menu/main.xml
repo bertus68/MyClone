@@ -1,0 +1,23 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<item
+        android:id="@+id/drop"
+        android:title="drop"/>
+
+	<item
+        android:id="@+id/init"
+        android:title="init"/>
+
+	<item
+        android:id="@+id/clean"
+        android:title="clean"/>
+
+    <item
+        android:id="@+id/copy"
+        android:title="copy"/>
+
+	<item
+        android:id="@+id/query"
+        android:title="query"/>
+
+</menu>
