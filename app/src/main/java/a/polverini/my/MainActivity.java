@@ -12,21 +12,123 @@ import java.util.*;
 import android.graphics.*;
 import android.text.style.*;
 import a.polverini.my.MainActivity.*;
+import android.view.inputmethod.*;
+import android.webkit.*;
+import android.content.*;
 
 public class MainActivity extends Activity 
 {
-	public static final boolean VERBOSE = true;
-	private static String h2url = H2.FILE("/storage/emulated/0/tmp/sql/egscc-test");
-	private static String pgurl = PG.URL("egscc-specification", "82.95.110.59", 5432); // 192.168.178.179
+	public static boolean VERBOSE = true;
+	public static String  H2URL = H2.FILE("/storage/emulated/0/tmp/sql/egscc-test");
+	public static String  PGURL = PG.URL("egscc-specification", "82.95.110.59", 5432);
+	
+	private static Properties configuration = new Properties();
 
+	private WebApp webapp;
+	
+	static {
+		configuration.put("h2url", H2URL);
+		configuration.put("pgurl", PGURL);
+		configuration.put("verbose", VERBOSE);
+	}
+	
+	public class WebApp {
+		
+		private final Context context;
+		private WebView view;
+		
+		public WebApp(Context context, WebView view) {
+			this.context = context;
+			this.view = view;
+			view.getSettings().setJavaScriptEnabled(true);
+			view.addJavascriptInterface(this, "my");
+			view.setWebViewClient(new WebViewClient() {
+					@Override
+					public boolean shouldOverrideUrlLoading(WebView view, String url) {
+						view.loadUrl(url);
+						return true;
+					}
+				});
+			view.evaluateJavascript("javascript: my.println(\"Hello!\");", null);
+		}
+
+		public void evaluate(String s) {
+			view.evaluateJavascript("javascript: " +s, new ValueCallback<String>() {
+					@Override
+					public void onReceiveValue(String s) {
+						if(s==null) return;
+						System.out.println(" < "+s);
+					}
+				});
+		}
+
+		@JavascriptInterface
+		public void toast(String s) {
+			Toast.makeText(context, s, Toast.LENGTH_SHORT).show();
+		}
+
+		@JavascriptInterface
+		public void println(String s) {
+			System.out.println(s);
+		}
+		
+		@JavascriptInterface
+		public void set(String key, Object val) {
+			configuration.put(key, val);
+			switch(key) {
+				case "verbose":
+					VERBOSE = val;
+					break;
+				case "pgurl":
+					PGURL = (String) val;
+					break;
+				case "h2url":
+					H2URL = (String) val;
+					break;
+				default:
+					break;
+			}
+		}
+
+		@JavascriptInterface
+		public Object get(String key) {
+			return configuration.get(key);
+		}
+		
+	}
+	
     @Override
     protected void onCreate(Bundle saved)
     {
         super.onCreate(saved);
         setContentView(R.layout.main);
-
+		
 		new TextHandler((TextView)findViewById(R.id.text));
 		System.out.println("MyClone rc-0.1.1");
+		
+		webapp = new WebApp(this, (WebView)findViewById(R.id.web));
+		
+		EditText edit = findViewById(R.id.edit);
+		edit.setOnEditorActionListener(new EditText.OnEditorActionListener() {
+				@Override
+				public boolean onEditorAction(TextView view, int id, KeyEvent event)
+				{
+					switch(id) {
+					case EditorInfo.IME_NULL:
+						if(event.getAction()==KeyEvent.ACTION_DOWN) {
+							String s = view.getText().toString();
+							System.out.println(" > "+s);
+							view.setText("");
+							webapp.evaluate(s);
+							return true;
+						}
+						break;
+					default:
+						break;
+					}
+					return false;
+				}
+		});
     }
 
 	@Override
@@ -72,7 +174,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.drop();
 			pgs.disconnect();
@@ -90,7 +192,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.init();
 			pgs.disconnect();
@@ -108,7 +210,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.clean();
 			pgs.disconnect();
@@ -126,8 +228,8 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			H2S h2s = new H2S(h2url);
-			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
+			H2S h2s = new H2S(H2URL);
+			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
 
 			h2s.connect();
 			pgs.connect();
@@ -150,8 +252,8 @@ public class MainActivity extends Activity
 		{
 			try { 
 				long t0 = System.currentTimeMillis();
-				System.out.println("url="+pgurl);
-				PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
+				System.out.println("url="+PGURL);
+				PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
 				pgs.connect();
 				pgs.query();
 				pgs.disconnect();
