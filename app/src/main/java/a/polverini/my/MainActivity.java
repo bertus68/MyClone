@@ -15,21 +15,51 @@ import a.polverini.my.MainActivity.*;
 import android.view.inputmethod.*;
 import android.webkit.*;
 import android.content.*;
+import android.util.*;
 
 public class MainActivity extends Activity 
 {
-	public static boolean VERBOSE = true;
-	public static String  H2URL = H2.FILE("/storage/emulated/0/tmp/sql/egscc-test");
-	public static String  PGURL = PG.URL("egscc-specification", "82.95.110.59", 5432);
 	
-	private static Properties configuration = new Properties();
-
+	private static final String GTA = "192.168.1.10";
+	private static final String GS7 = "192.168.1.11";
+	
 	private WebApp webapp;
+	private ProgressBar progress;
+	private static Configuration config = new Configuration();
+	private static boolean verbose = false;
+	private static String pgurl = PG.URL("egscc-specification");
+	private static String h2url = H2.FILE("/storage/emulated/0/tmp/sql/egscc-test");
 	
-	static {
-		configuration.put("h2url", H2URL);
-		configuration.put("pgurl", PGURL);
-		configuration.put("verbose", VERBOSE);
+	static class Configuration extends Properties {
+		
+		public static final String PATH = "/data/data/a.polverini.my/my.xml";
+		
+		public Configuration() {
+			super();
+			load();
+		}
+		
+		public void dispose() {
+			save();
+		}
+		
+		@JavascriptInterface
+		public void load() {
+			try {
+				this.loadFromXML(new FileInputStream(PATH));
+			} catch (IOException e) {
+				System.out.printf("%s %s\n", e.getClass().getSimpleName(), e.getMessage());
+			}
+		}
+
+		@JavascriptInterface
+		public void save() {
+			try {
+				this.storeToXML(new FileOutputStream(PATH), "");
+			} catch (IOException e) {
+				System.out.printf("%s %s\n", e.getClass().getSimpleName(), e.getMessage());
+			}
+		}
 	}
 	
 	public class WebApp {
@@ -41,7 +71,7 @@ public class MainActivity extends Activity
 			this.context = context;
 			this.view = view;
 			view.getSettings().setJavaScriptEnabled(true);
-			view.addJavascriptInterface(this, "my");
+			view.addJavascriptInterface(this, "webapp");
 			view.setWebViewClient(new WebViewClient() {
 					@Override
 					public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -49,15 +79,16 @@ public class MainActivity extends Activity
 						return true;
 					}
 				});
-			view.evaluateJavascript("javascript: my.println(\"Hello!\");", null);
+			evaluate("webapp.println(\"Hello!\");");
 		}
 
 		public void evaluate(String s) {
 			view.evaluateJavascript("javascript: " +s, new ValueCallback<String>() {
 					@Override
 					public void onReceiveValue(String s) {
-						if(s==null) return;
-						System.out.println(" < "+s);
+						if(s!=null && !s.equals("null")) {
+							System.out.println(" < "+s);
+						}
 					}
 				});
 		}
@@ -71,64 +102,129 @@ public class MainActivity extends Activity
 		public void println(String s) {
 			System.out.println(s);
 		}
-		
+
 		@JavascriptInterface
-		public void set(String key, Object val) {
-			configuration.put(key, val);
-			switch(key) {
-				case "verbose":
-					VERBOSE = val;
-					break;
-				case "pgurl":
-					PGURL = (String) val;
-					break;
-				case "h2url":
-					H2URL = (String) val;
-					break;
-				default:
-					break;
-			}
+		public void setProperty(String key, String val) {
+			System.out.println("DEBUG: setProperty(key=\""+key+"\", val=\""+val+"\")");
+			config.setProperty(key, val);
 		}
 
 		@JavascriptInterface
-		public Object get(String key) {
-			return configuration.get(key);
+		public String getProperty(String key) {
+			System.out.println("DEBUG: getProperty(key=\""+key+"\")");
+			return config.getProperty(key);
+		}
+
+		@JavascriptInterface
+		public String GalaxyTabA() {
+			return GTA;
+		}
+
+		@JavascriptInterface
+		public String GalaxyS7() {
+			return GS7;
+		}
+		
+		@JavascriptInterface
+		public String pgurl(String name) {
+			System.out.println("DEBUG: pgurl(name=\""+name+"\")");
+			return PG.URL(name);
+		}
+
+		@JavascriptInterface
+		public String pgurl(String name, String host, int port) {
+			System.out.println("DEBUG: pgurl(name=\""+name+"\", host=\""+host+"\", port="+port+")");
+			return PG.URL(name, host, port);
+		}
+		
+		@JavascriptInterface
+		public String h2url(String name, String host, int port) {
+			System.out.println("DEBUG: h2url(name=\""+name+"\", host=\""+host+"\", port="+port+")");
+			return H2.URL(name, host, port);
+		}
+		
+		@JavascriptInterface
+		public String h2file(String name) {
+			System.out.println("DEBUG: h2file(name=\""+name+"\")");
+			return H2.FILE(name);
+		}
+
+		@JavascriptInterface
+		public void query() {
+			System.out.println("DEBUG: query()");
+			new Query().execute();
 		}
 		
 	}
 	
-    @Override
-    protected void onCreate(Bundle saved)
-    {
-        super.onCreate(saved);
-        setContentView(R.layout.main);
+	public void swipe() {
+		SwippeableRelativeLayout l = new SwippeableRelativeLayout(this);
+
+		RelativeLayout.LayoutParams p = new RelativeLayout.LayoutParams(
+			RelativeLayout.LayoutParams.FILL_PARENT,
+			RelativeLayout.LayoutParams.FILL_PARENT);
+			
+		LayoutInflater inflater = LayoutInflater.from(this);
+		View inflated = inflater.inflate(R.layout.main, null);
+		l.addView(inflated);
+
+        setContentView(l, p);
+		TextView text = findViewById(R.id.text);
+		new TextHandler(text);
+		System.out.println("MyClone rc-0.1.1 (swipeable)");
+		hookGestureDetector(this, text);
 		
-		new TextHandler((TextView)findViewById(R.id.text));
+	}
+	
+	public void main() {
+		
+		setContentView(R.layout.main);
+		
+		TextView text = findViewById(R.id.text);
+		new TextHandler(text);
 		System.out.println("MyClone rc-0.1.1");
 		
-		webapp = new WebApp(this, (WebView)findViewById(R.id.web));
+		progress = this.findViewById(R.id.progress);
+		if(config.containsKey("verbose")) {
+			verbose = config.get("verbose");
+		}
 		
+		WebView webview = new WebView(this);
+		webapp = new WebApp(this, webview);
+		webapp.evaluate("webapp.setProperty(\"pgurl\", webapp.pgurl(\"egscc-specification\"))");
+		webapp.evaluate("webapp.query()");
+		webapp.evaluate("webapp.println(\"Have a nice day!\");");
+
 		EditText edit = findViewById(R.id.edit);
 		edit.setOnEditorActionListener(new EditText.OnEditorActionListener() {
 				@Override
 				public boolean onEditorAction(TextView view, int id, KeyEvent event)
 				{
 					switch(id) {
-					case EditorInfo.IME_NULL:
-						if(event.getAction()==KeyEvent.ACTION_DOWN) {
-							String s = view.getText().toString();
-							System.out.println(" > "+s);
-							view.setText("");
-							webapp.evaluate(s);
-							return true;
-						}
-						break;
-					default:
-						break;
+						case EditorInfo.IME_NULL:
+							if(event.getAction()==KeyEvent.ACTION_DOWN) {
+								String s = view.getText().toString();
+								System.out.println(" > "+s);
+								view.setText("");
+								webapp.evaluate(s);
+								return true;
+							}
+							break;
+						default:
+							break;
 					}
 					return false;
 				}
-		});
+			});
+	}
+	
+	
+    @Override
+    protected void onCreate(Bundle saved)
+    {
+        super.onCreate(saved);
+        setContentView(R.layout.splash);
+		splash();
     }
 
 	@Override
@@ -143,6 +239,9 @@ public class MainActivity extends Activity
 	public boolean onOptionsItemSelected(MenuItem item) {
 		try {
 			switch (item.getItemId()) {
+				case R.id.swipe:
+					swipe();
+					return true;
 				case R.id.drop:
 					new Drop().execute();
 					return true;
@@ -166,7 +265,43 @@ public class MainActivity extends Activity
 		}
 		return true;
 	}
+	
+	public void splash() {
+		new AsyncTask() {
+		
+			@Override
+			protected Object doInBackground(Object[] args)
+			{
+				if(args.length==0) return null;
+				TextView v = (TextView)args[0];
+				try {
+					for(int i=3; i>=0; i--) {
+						Thread.sleep(1000);
+						publishProgress(v, i);
+					}
+				} catch (InterruptedException e) {}
 
+				return null;
+			}
+
+			@Override
+			public void onProgressUpdate(Object[] args) {
+				if(args.length>=2) {
+					TextView v = (TextView)args[0];
+					int i = args[1];
+					v.setText(String.format("%d", i));
+				}
+			}
+
+			@Override
+			public void onPostExecute(Object result) {
+				main();
+			}
+
+		}.execute(findViewById(R.id.text));
+
+	}
+	
 	public static class Drop extends AsyncTask
 	{
 		@Override
@@ -174,7 +309,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.drop();
 			pgs.disconnect();
@@ -192,7 +327,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.init();
 			pgs.disconnect();
@@ -210,7 +345,7 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
+			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
 			pgs.connect();
 			pgs.clean();
 			pgs.disconnect();
@@ -228,8 +363,8 @@ public class MainActivity extends Activity
 		{
 			long t0 = System.currentTimeMillis();
 
-			H2S h2s = new H2S(H2URL);
-			PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
+			H2S h2s = new H2S(h2url);
+			PGS pgs = new PGS(pgurl, "apolverini", "Sabr1na$");
 
 			h2s.connect();
 			pgs.connect();
@@ -252,11 +387,21 @@ public class MainActivity extends Activity
 		{
 			try { 
 				long t0 = System.currentTimeMillis();
-				System.out.println("url="+PGURL);
-				PGS pgs = new PGS(PGURL, "apolverini", "Sabr1na$");
+				
+				String pgurl = config.getProperty("pgurl", PG.URL("egscc-specification"));
+				System.out.println("pgurl="+pgurl);
+				
+				String pguser = config.getProperty("pguser", "apolverini");
+				System.out.println("pguser="+pguser);
+				
+				String pgpswd = config.getProperty("pgpswd", "Sabr1na$");
+				System.out.println("pgpswd="+pgpswd);
+				
+				PGS pgs = new PGS(pgurl, pguser, pgpswd);
 				pgs.connect();
 				pgs.query();
 				pgs.disconnect();
+				
 				long dt = System.currentTimeMillis()-t0;
 				System.out.printf("%5.3f seconds\n",dt/1000.0);
 			} catch(Exception e) {
@@ -746,7 +891,11 @@ public class MainActivity extends Activity
 		public static String CREATE(String table) {
 			return null;
 		}
-
+		
+		public H2S(String url, String user, String pswd) {
+			super(url, user, pswd);
+		}
+		
 		public H2S(String url) {
 			super(url, "SA", "");
 		}
@@ -785,7 +934,6 @@ public class MainActivity extends Activity
 		public void query() {
 			for(int i=0; i<TABLES.length; i++) {
 				query(TABLES[i], new DB.QueryCallback() {
-
 						@Override
 						public void results(String table, Set<Properties> rows)
 						{
@@ -815,7 +963,7 @@ public class MainActivity extends Activity
 		}
 
 		public static String URL(String name) {
-			return String.format("jdbc:postgresql://%s:%d/%s", HOST, PORT, name);
+			return URL(name, HOST, PORT);
 		}
 
 		public PG(String url, String user, String pswd) {
@@ -830,6 +978,9 @@ public class MainActivity extends Activity
 
 	public static class H2 extends DB
 	{
+		private static String HOST = "localhost";
+		private static int PORT = 9092;
+		
 		static {
 			try {
 				Class.forName("org.h2.Driver");
@@ -841,7 +992,15 @@ public class MainActivity extends Activity
 		public static String FILE(String path) {
 			return String.format("jdbc:h2://%s", path);
 		}
-
+		
+		public static String URL(String name, String host, int port) {
+			return String.format("jdbc:h2:tcp://%s:%d/%s", host, port, name);
+		}
+		
+		public static String URL(String name) {
+			return URL(name, HOST, PORT);
+		}
+		
 		public H2(String url, String user, String pswd) {
 			super(url, user, pswd);
 		}
@@ -930,7 +1089,7 @@ public class MainActivity extends Activity
 		public void exec(String sql) {
 			if(!isConnected()) return;
 			if(sql==null) return;
-			if(VERBOSE) System.out.println(sql);
+			if(verbose) System.out.println(sql);
 			Statement statement = null;
 			try {
 				statement = connection.createStatement();
@@ -950,7 +1109,7 @@ public class MainActivity extends Activity
 				for(int i=0; i<list.size(); i++){
 					String sql = list.get(i);
 					if(sql!=null) {
-						if(VERBOSE) System.out.println(sql);
+						if(verbose) System.out.println(sql);
 						statement.addBatch(sql);
 					}
 					if(i%100==0 || i==list.size()) {
@@ -997,25 +1156,25 @@ public class MainActivity extends Activity
 			ResultSet rs = null;
 			try {
 				String query = String.format("SELECT * FROM %s", table);
-				if(VERBOSE) System.out.println(query);
+				if(verbose) System.out.println(query);
 				statement = connection.createStatement();
 				rs = statement.executeQuery(query);
 				ResultSetMetaData metadata = rs.getMetaData();
 				List<String> names = new ArrayList<>();
 				for(int c=1; c<=metadata.getColumnCount(); c++){
 					String name = metadata.getColumnName(c);
-					if(VERBOSE) System.out.printf("%d) %s\n",c, name);
+					if(verbose) System.out.printf("%d) %s\n",c, name);
 					names.add(name);
 				}
 
 				int n=0;
 				Set<Properties> rows = new HashSet<>();
 				while (rs.next()) {
-					if(VERBOSE) System.out.printf("%s[%d]\n",table,n);
+					if(verbose) System.out.printf("%s[%d]\n",table,n);
 					Properties properties = new Properties();
 					for(int c=1; c<=metadata.getColumnCount(); c++){
 						Object val = rs.getObject(c);
-						if(VERBOSE) System.out.printf("  %s=%s\n",names.get(c-1), val);
+						if(verbose) System.out.printf("  %s=%s\n",names.get(c-1), val);
 						if(val!=null) properties.put(names.get(c-1), val);
 					}
 					rows.add(properties);
@@ -1039,7 +1198,7 @@ public class MainActivity extends Activity
 			ResultSet rs = null;
 			try {
 				String query = String.format("SELECT * FROM %s", table);
-				//if(VERBOSE) 
+				//if(verbose) 
 				System.out.println(query);
 				statement = db.connection.createStatement();
 				rs = statement.executeQuery(query);
@@ -1052,7 +1211,7 @@ public class MainActivity extends Activity
 				}
 
 				String insert = String.format("INSERT INTO %s (%s) VALUES (%s)", table, String.join(", ", names), String.join(", ", token));
-				if(VERBOSE) System.out.println(insert);
+				if(verbose) System.out.println(insert);
 				prepared = connection.prepareStatement(insert);
 				int n=0;
 				while (rs.next()) {
@@ -1168,5 +1327,129 @@ public class MainActivity extends Activity
 					break;
 			}
 		}
+	}
+	
+	public abstract class CustomGestureListener extends GestureDetector.SimpleOnGestureListener
+	{
+
+		private final View view;
+
+		public CustomGestureListener(View view){
+			this.view = view;
+		}
+
+		@Override
+		public boolean onSingleTapConfirmed(MotionEvent e) {
+			view.onTouchEvent(e);
+			return super.onSingleTapConfirmed(e);
+		}
+
+		@Override
+		public boolean onSingleTapUp(MotionEvent e) {
+			onTouch();
+			return false;
+		}
+
+		@Override
+		public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+			return (e1.getX() < e2.getX()) ? onSwipeRight() :
+				   (e1.getX() > e2.getX()) ? onSwipeLeft()  :
+					onTouch();
+		}
+
+		public abstract boolean onSwipeRight();
+		public abstract boolean onSwipeLeft();
+		public abstract boolean onTouch();
+	}
+	
+	public interface ISwippeable {
+		public void setGestureDetector(GestureDetector detector);
+	}
+
+	public class SwippeableRelativeLayout extends RelativeLayout implements ISwippeable {
+		
+		private GestureDetector detector;
+
+		public SwippeableRelativeLayout(Context context) {
+			super(context);
+		}
+
+		public SwippeableRelativeLayout(Context context, AttributeSet attributes) {
+			super(context, attributes);
+		}
+
+		@Override
+		public boolean onTouchEvent(MotionEvent event) {
+			return detector.onTouchEvent(event);
+		}
+		
+		@Override
+		public void setGestureDetector(GestureDetector detector) {
+			this.detector = detector;
+		}
+		
+	}
+	
+	public class SwippeableLinearLayout extends LinearLayout implements ISwippeable {
+
+		private GestureDetector detector;
+
+		public SwippeableLinearLayout(Context context) {
+			super(context);
+		}
+
+		public SwippeableLinearLayout(Context context, AttributeSet attributes) {
+			super(context, attributes);
+		}
+
+		@Override
+		public boolean onTouchEvent(MotionEvent event) {
+			return detector.onTouchEvent(event);
+		}
+		
+		@Override
+		public void setGestureDetector(GestureDetector detector) {
+			this.detector = detector;
+		}
+	}
+	
+	private GestureDetector detector;
+	
+	private void hookGestureDetector(Context context, View view) {
+		System.out.println("hookGestureDetector()");
+		this.detector = new GestureDetector(context, new CustomGestureListener(view) {
+
+				@Override
+				public boolean onSwipeRight() {
+					System.out.println("onSwipeRight()");
+					return false;
+				}
+
+				@Override
+				public boolean onSwipeLeft() {
+					System.out.println("onSwipeLeft()");
+					return false;
+
+				}
+
+				@Override
+				public boolean onTouch() {
+					System.out.println("onTouch()");
+					return false;
+				}
+			});
+		System.out.println("setOnTouchListener()");
+		view.setOnTouchListener(new View.OnTouchListener() {
+				@Override
+				public boolean onTouch(View v, MotionEvent event) {
+					return !detector.onTouchEvent(event);
+				}
+			});
+
+		if(view instanceof ISwippeable) {
+			System.out.println("setGestureDetector()");
+			((ISwippeable)view).setGestureDetector(detector);
+		}
+		
 	}
 }

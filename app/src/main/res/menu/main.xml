@@ -1,5 +1,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-
+	
+	<item
+        android:id="@+id/swipe"
+        android:title="swipe"/>
+	
 	<item
         android:id="@+id/drop"
         android:title="drop"/>

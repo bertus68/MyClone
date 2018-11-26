@@ -1,33 +1,40 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 	
-	<WebView
-		android:id="@+id/web"
-		android:layout_width="wrap_content"
-		android:layout_height="wrap_content"
-		/>
-	
-	<TextView
-		android:id="@+id/text"
-		android:layout_width="fill_parent"
-		android:layout_height="fill_parent"
-		android:layout_weight="0.8"
-		android:gravity="top"
-		android:scrollbars="vertical"
-		android:text=""/>
-
+	<!-- android:background="@drawable/border" -->
+		
 	<EditText
 		android:id="@+id/edit"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:layout_weight="0.2"
-		android:background="@drawable/border"
+		android:layout_marginTop="10dp"
 		android:gravity="top"
 		android:scrollbars="vertical"
 		android:textAppearance="?android:attr/textAppearanceLarge"
 		android:inputType="text|textNoSuggestions|textMultiLine"
 		android:text=""/>
 	
-</LinearLayout>
+	<ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+		android:layout_below="@+id/edit"
+        android:indeterminate="false"
+        android:max="10"
+        android:padding="10dip" />
+
+	
+	<TextView
+		android:id="@+id/text"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:layout_marginBottom="10dp"
+		android:layout_below="@+id/progress"
+		android:gravity="top"
+		android:scrollbars="vertical"
+		android:text=""/>
+	
+</RelativeLayout>
